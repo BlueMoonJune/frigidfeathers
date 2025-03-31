@@ -27,7 +27,7 @@ local tiles = {
 	}
 }
 
-local map = {
+map = {
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
@@ -70,9 +70,8 @@ for k, v in pairs(tiles) do
 	end
 end
 
-print(love.graphics.isGammaCorrect())
 
-love.graphics.setBlendMode("alpha", "alphamultiply")
+--love.graphics.setBlendMode("alpha", "premultiplied")
 
 canv:renderTo(function ()
 	for i, r in ipairs(map) do
