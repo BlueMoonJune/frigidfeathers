@@ -21,7 +21,7 @@ local function _draw(self)
 	love.graphics.draw(self.prop.image, (self.prop.offsetX or 0) + self.x, (self.prop.offsetY or 0) + self.y)
 end
 
-local props = {}
+local props
 
 local function instantiateProp(prop, x, y)
 	local ret = {prop = prop, x = x, y = y, draw = _draw}
@@ -29,11 +29,13 @@ local function instantiateProp(prop, x, y)
 	return ret
 end
 
+
 local shader = love.graphics.newShader("assets/water.glsl")
 local waterTex = love.graphics.newImage("assets/waterNoise.png")
 waterTex:setWrap("repeat", "repeat")
 
 local snowNoise = love.graphics.newImage("assets/snowNoise.png")
+snowNoise:setWrap("repeat", "repeat")
 propKey._0_1_0_1.shader:send("noise", snowNoise)
 
 local grassShader = love.graphics.newShader("assets/grass.glsl")
@@ -45,14 +47,6 @@ shader:send("speeds"
 )
 shader:send("texCount", 2)
 
-for i = 0, propmap:getHeight() - 1 do
-	for j = 0, propmap:getWidth() - 1 do
-		local prop = propKey[("_%d_%d_%d_%d"):format(propmap:getPixel(j, i))]
-		if prop then
-			instantiateProp(prop, j * 16, i * 16)
-		end
-	end
-end
 
 local player = {
 	x = 256,
@@ -110,13 +104,7 @@ local function createIce(x, y)
 	ice[x..","..y] = {x = x, y = y}
 end
 
-table.insert(props, player)
-
-local t = 89
-
-for i = 1, 10 do
-createDuck(math.random(100, 220), math.random(80, 160))
-end
+local t
 
 function collide(px, py, x, y, c, cx, cy)
 	local l, r, t, b = c.l + cx, c.r + cx, c.t + cy, c.b + cy
@@ -156,10 +144,58 @@ local iceCol = {
 	b=8,
 }
 
-local score = 15
+local score
+
+local highScore = tonumber(love.filesystem.read("high.txt"), 10) or 0
+
+local newHigh = false
+
+local started = false
+
+local titleAnim = 0
+
+local function start()
+
+	props = {}
+	for i = 0, propmap:getHeight() - 1 do
+		for j = 0, propmap:getWidth() - 1 do
+			local prop = propKey[("_%d_%d_%d_%d"):format(propmap:getPixel(j, i))]
+			if prop then
+				instantiateProp(prop, j * 16, i * 16)
+			end
+		end
+	end
+
+	player.x = 256
+	player.y = 128
+	player.duck = nil
+	score = 0
+
+	ice = {}
+	ducks = {}
+
+	table.insert(props, player)
+
+	t = 0
+	started = false
+
+	for i = 1, 10 do
+		createDuck(math.random(100, 220), math.random(80, 160))
+	end
+
+	createIce(14, 10)
+	createIce(6, 4)
+
+	newHigh = false
+
+end
+
+start()
 
 function love.update(dt)
-	t = t + dt
+	if started then
+		t = t + dt
+	end
 	if t > 90 then
 		return
 	end
@@ -176,6 +212,7 @@ function love.update(dt)
 		player.facing = 1
 	end
 	if vy ~= 0 or vx ~= 0 then
+		started = true
 		player.frame = (player.frame + dt * 8) % 4
 	else
 		player.frame = 0
@@ -284,22 +321,23 @@ function love.update(dt)
 	end
 
 	for i, v in pairs(ice) do
-		if math.random() < dt * t / 120 then
+		if math.random() < dt * t / 180 then
 			local d = math.random(1, 4)
 			local dx = ({0,-1, 0, 1})[d]
 			local dy = ({1, 0,-1, 0})[d]
 			createIce(v.x + dx, v.y + dy)
 		end
 	end
+
+	titleAnim = started and math.max(0, titleAnim - dt) or math.min(1, titleAnim + dt)
 end
 
 local iceTexture = love.graphics.newImage("assets/ice.png")
 for i = 14, 20 do
 end
-createIce(14, 10)
-createIce(6, 4)
 
 local duckIcon = love.graphics.newImage("assets/duckIcon.png")
+local logo = love.graphics.newImage("assets/logo.png")
 
 function love.draw()
 
@@ -334,10 +372,23 @@ function love.draw()
 	end
 
 	love.graphics.setShader()
-	if t < 90 then
-		love.graphics.draw(duckIcon)
-		love.graphics.print(" "..score, 12, 4)
-	else
+
+	print(highScore)
+	love.graphics.draw(duckIcon, 292, 112)
+	love.graphics.setColor(0.188235, 0.219608, 0.262745)
+	love.graphics.print(" "..score, 304, 116)
+	love.graphics.setColor(1, 1, 1, 1)
+	if titleAnim > 0 then
+		local helpOff = (1-titleAnim) ^ 4 * 16
+		love.graphics.setColor(1, 1, 1, titleAnim)
+		love.graphics.print("SAVE THE DUCKS FROM THE FREEZING WINTER!", 70, 155 + helpOff)
+		love.graphics.print("ARROW KEYS TO GRAB THE DUCKS AND", 70, 165 + helpOff)
+		love.graphics.print("MOVE THEM INTO THE TRUCK.", 140, 175 + helpOff)
+		love.graphics.setColor(1, 1, 1, 1)
+		love.graphics.draw(logo, 93, 50 - helpOff * 6, 0, 2, 2)
+	end
+
+	if t > 90 then
 		love.graphics.setColor(0, 0, 0, 0.9)
 		love.graphics.rectangle("fill", 0, 0, 320, 240)
 	love.graphics.setColor(1, 1, 1)
@@ -350,6 +401,19 @@ function love.draw()
 		love.graphics.draw(duckIcon, 144, 120)
 	end
 	if t > 93 + score / 10 then
-		love.graphics.print("HIGH: "..999, 120, 135, 0, 2, 2)
+		if not newHigh or (t - 93 - score / 10) % 1 < 0.5 then
+			love.graphics.print("HIGH: "..highScore, 120, 135, 0, 2, 2)
+		end
+	end
+	if t > 94 + score / 10 and score > highScore then
+		highScore = score
+		newHigh = true
+		love.filesystem.write("high.txt", tostring(score))
+	end
+	if t > 95 + score / 10 then
+		love.graphics.print("R TO RESTART", 110, 155, 0, 2, 2)
+		if love.keyboard.isDown("r") then
+			start()
+		end
 	end
 end
